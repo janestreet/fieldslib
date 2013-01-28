@@ -29,15 +29,6 @@ module Inspect = struct
     | _                                          -> assert false
   ;;
 
-  let string_of_ctyp ctyp =
-    let module PP = Camlp4.Printers.OCaml.Make (Syntax) in
-    let conv_ctyp = (new PP.printer ())#ctyp in
-    let buffer    = Buffer.create 32 in
-    Format.bprintf buffer "%a%!" conv_ctyp ctyp;
-    let s = Buffer.contents buffer in
-    s
-  ;;
-
   let get_field_name fld =
     let name, _, _ = field fld in
     name
@@ -358,7 +349,10 @@ module Gen_struct = struct
           >>)
     in
     let f    = Create.lambda _loc (patterns @ [ <:patt< compile_acc__ >> ]) body in
-    <:str_item< value make_creator = $f$ >>
+    <:str_item<
+      value make_creator = $f$;
+      value _ = make_creator
+    >>
   ;;
 
 
@@ -370,7 +364,10 @@ module Gen_struct = struct
     in
     let patterns = List.map names ~f:(fun x -> label_arg _loc x ) in
     let f    = Create.lambda _loc patterns f  in
-    <:str_item< value create = $f$ >>
+    <:str_item<
+      value create = $f$;
+      value _ = create
+    >>
   ;;
 
   let fold_fun ~record_name:_ _loc ty =
@@ -383,7 +380,10 @@ module Gen_struct = struct
     let init     = label_arg ~label:"init" _loc "init__" in
     let lambda = Create.lambda _loc
       ( init :: patterns ) body in
-    <:str_item< value fold = $lambda$ >>
+    <:str_item<
+      value fold = $lambda$;
+      value _ = fold
+    >>
   ;;
 
   let and_fun ~record_name:_ _loc ty =
@@ -394,7 +394,10 @@ module Gen_struct = struct
       List.fold_left names ~init:<:expr< True >> ~f:field_fold in
     let patterns = List.map names ~f:(label_arg_fun _loc) in
     let lambda = Create.lambda _loc patterns body in
-    <:str_item< value for_all = $lambda$ >>
+    <:str_item<
+      value for_all = $lambda$;
+      value _ = for_all
+    >>
   ;;
 
   let or_fun ~record_name:_ _loc ty =
@@ -405,7 +408,10 @@ module Gen_struct = struct
       List.fold_left names ~init:<:expr< False >> ~f:field_fold in
     let patterns = List.map names ~f:(label_arg_fun _loc) in
     let lambda = Create.lambda _loc patterns body in
-    <:str_item< value exists = $lambda$ >>
+    <:str_item<
+      value exists = $lambda$;
+      value _ = exists
+    >>
   ;;
 
   let iter_fun ~record_name:_ _loc ty =
@@ -419,7 +425,10 @@ module Gen_struct = struct
     let patterns = List.map names ~f:(label_arg_fun _loc) in
     let lambda     = Create.lambda _loc
         (patterns) body in
-    <:str_item< value iter = $lambda$ >>
+    <:str_item<
+      value iter = $lambda$;
+      value _ = iter
+    >>
   ;;
 
   let direct_iter_fun ~record_name:_ _loc ty =
@@ -435,7 +444,10 @@ module Gen_struct = struct
         ~f:(fun acc n -> <:expr< ( $acc$ ; $iter_field n$ ) >>) in
     let patterns = List.map names ~f:(label_arg_fun _loc) in
     let lambda     = Create.lambda _loc ( <:patt< record__ >> :: patterns) body in
-    <:str_item< value iter = $lambda$ >>
+    <:str_item<
+      value iter = $lambda$;
+      value _ = iter
+    >>
   ;;
 
   let direct_fold_fun ~record_name:_ _loc ty =
@@ -451,7 +463,10 @@ module Gen_struct = struct
     let init     = label_arg ~label:"init" _loc "init__" in
     let lambda = Create.lambda _loc
       ( <:patt< record__ >> :: init :: patterns ) body in
-    <:str_item< value fold = $lambda$ >>
+    <:str_item<
+      value fold = $lambda$;
+      value _ = fold
+    >>
   ;;
 
   let map_fun ~record_name:_ _loc ty =
@@ -461,7 +476,10 @@ module Gen_struct = struct
       let e = <:expr< $lid:field_name ^ "_fun__"$ $lid:field_name$ >> in
       (field_name, e ))) in
     let f    = Create.lambda _loc patterns body in
-    <:str_item< value map = $f$ >>
+    <:str_item<
+      value map = $f$;
+      value _ = map
+    >>
   ;;
 
   let to_list_fun ~record_name:_ _loc ty =
@@ -472,7 +490,10 @@ module Gen_struct = struct
         <:expr< [ $lid:field_name ^ "_fun__" $ $lid:field_name$  :: $tail$ ] >> )
     in
     let f        = Create.lambda _loc patterns body in
-    <:str_item< value to_list = $f$ >>
+    <:str_item<
+      value to_list = $f$;
+      value _ = to_list
+    >>
   ;;
 
   let map_poly ~record_name:_ _loc ty =
@@ -486,7 +507,10 @@ module Gen_struct = struct
         ~init:<:expr<[]>>
         ~f:fold
     in
-    <:str_item< value map_poly record__ = $body$ >>
+    <:str_item<
+      value map_poly record__ = $body$;
+      value _ = map_poly
+    >>
   ;;
 
   let record ~record_name _loc ty =
@@ -511,6 +535,7 @@ module Gen_struct = struct
         $getter_and_setters$ ;
         module Fields = struct
           value names = $names$ ;
+          value _ = names ;
           $fields$ ;
           $create$ ; $simple_create$ ; $iter$ ; $fold$ ; $map$ ; $map_poly$ ; $andf$ ; $orf$ ; $to_list$ ;
           module Direct = struct
