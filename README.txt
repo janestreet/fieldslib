@@ -107,7 +107,7 @@ price differences:
       let use op = fun field ->
         op (Field.get field a) (Field.get field b)
       in
-      let price_equal p1 p2 = abs_float (p1 -. p2) < 0.001 in
+      let price_equal p1 p2 = Float.abs (p1 -. p2) < 0.001 in
       Fields.for_all
         ~dir:(use (=)) ~quantity:(use (=))
         ~price:(use price_equal) ~cancelled:(use (=))

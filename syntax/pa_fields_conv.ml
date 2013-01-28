@@ -1,3 +1,8 @@
+(* Generated code should depend on the environment in scope as little as
+   possible.  E.g. rather than [foo = []] do [match foo with [] ->], to eliminate the
+   use of [=].  It is especially important to not use polymorphic comparisons, since we
+   are moving more and more to code that doesn't have them in scope. *)
+
 module List = ListLabels
 open Printf
 open Camlp4.PreCast
@@ -37,8 +42,30 @@ module Inspect = struct
   let fields ty = List.map (Ast.list_of_ctyp ty []) ~f:field
 end
 
+let generate_at_least_once rec_ ~f ~combine typedefs =
+  if not rec_ then
+    failwith "nonrec is not compatible with the `fields' preprocessor";
+  let rec aux = function
+    | Ast.TyDcl (_loc, ty_name, tps, rhs, _) -> f _loc ~ty_name ~tps ~rhs
+    | Ast.TyAnd (_loc, td1, td2) -> (
+      match aux td1, aux td2 with
+      | `Ok str1, `Ok str2 -> `Ok (combine _loc str1 str2)
+      | `Ok str1, `Error _ -> `Ok str1
+      | `Error _, `Ok str2 -> `Ok str2
+      | `Error _, `Error _ ->
+        `Error "'with fields' can only be applied on type definitions in which at \
+                least one type definition is a record"
+    )
+    | Ast.TyNil _loc ->
+      `Error "'with fields': unexpected TyNil without a TyAnd somewhere around!!"
+    | _ -> assert false in
+
+  match aux typedefs with
+  | `Ok res -> res
+  | `Error s -> failwith s
+
 let raise_unsupported () =
-  failwith "Unsupported use of fields (you can only use it on records)."
+  `Error "Unsupported use of fields (you can only use it on records)."
 
 module Gen_sig = struct
   let apply_type _loc ~ty_name ~tps =
@@ -239,23 +266,30 @@ module Gen_sig = struct
       >>
   ;;
 
+  let mani ~ty_name ~tps ty =
+    match ty with
+    | <:ctyp@loc< { $x$ } >> ->
+      `Ok (record ~ty_name ~tps loc x)
+    | _ -> `Error "the right hand side of the manifest must be a record"
+
   let fields_of_ty_sig _loc ~ty_name ~tps ~rhs =
     let unsupported = (fun _ _ -> raise_unsupported ()) in
     Gen.switch_tp_def
       ~alias:unsupported
       ~sum:unsupported
       ~variants:unsupported
-      ~mani:unsupported
+      ~mani:(fun (_:Loc.t) _tp1 tp2 -> mani ~ty_name ~tps tp2)
       ~nil:(fun _ -> raise_unsupported ())
-      ~record:(record ~ty_name ~tps)
+      ~record:(fun loc ty -> `Ok (record ~ty_name ~tps loc ty))
       rhs
 
-  let generate = function
-    | Ast.TyDcl (_loc, ty_name, tps, rhs, _) -> fields_of_ty_sig _loc ~ty_name ~tps ~rhs
-    | Ast.TyAnd (_loc, _, _) as tds    ->
-        ignore (_loc, tds);
-        failwith "Not supported"
-    | _                             -> assert false
+  let generate rec_ typedefs =
+    generate_at_least_once
+      rec_
+      ~f:fields_of_ty_sig
+      ~combine:(fun _loc item1 item2 -> <:sig_item< $item1$; $item2$; >>)
+      typedefs
+
 end
 
 module Gen_struct = struct
@@ -351,7 +385,6 @@ module Gen_struct = struct
     let f    = Create.lambda _loc (patterns @ [ <:patt< compile_acc__ >> ]) body in
     <:str_item<
       value make_creator = $f$;
-      value _ = make_creator
     >>
   ;;
 
@@ -366,7 +399,6 @@ module Gen_struct = struct
     let f    = Create.lambda _loc patterns f  in
     <:str_item<
       value create = $f$;
-      value _ = create
     >>
   ;;
 
@@ -382,7 +414,6 @@ module Gen_struct = struct
       ( init :: patterns ) body in
     <:str_item<
       value fold = $lambda$;
-      value _ = fold
     >>
   ;;
 
@@ -396,7 +427,6 @@ module Gen_struct = struct
     let lambda = Create.lambda _loc patterns body in
     <:str_item<
       value for_all = $lambda$;
-      value _ = for_all
     >>
   ;;
 
@@ -410,7 +440,6 @@ module Gen_struct = struct
     let lambda = Create.lambda _loc patterns body in
     <:str_item<
       value exists = $lambda$;
-      value _ = exists
     >>
   ;;
 
@@ -427,7 +456,6 @@ module Gen_struct = struct
         (patterns) body in
     <:str_item<
       value iter = $lambda$;
-      value _ = iter
     >>
   ;;
 
@@ -446,7 +474,6 @@ module Gen_struct = struct
     let lambda     = Create.lambda _loc ( <:patt< record__ >> :: patterns) body in
     <:str_item<
       value iter = $lambda$;
-      value _ = iter
     >>
   ;;
 
@@ -465,7 +492,6 @@ module Gen_struct = struct
       ( <:patt< record__ >> :: init :: patterns ) body in
     <:str_item<
       value fold = $lambda$;
-      value _ = fold
     >>
   ;;
 
@@ -478,7 +504,6 @@ module Gen_struct = struct
     let f    = Create.lambda _loc patterns body in
     <:str_item<
       value map = $f$;
-      value _ = map
     >>
   ;;
 
@@ -492,7 +517,6 @@ module Gen_struct = struct
     let f        = Create.lambda _loc patterns body in
     <:str_item<
       value to_list = $f$;
-      value _ = to_list
     >>
   ;;
 
@@ -509,7 +533,6 @@ module Gen_struct = struct
     in
     <:str_item<
       value map_poly record__ = $body$;
-      value _ = map_poly
     >>
   ;;
 
@@ -535,7 +558,6 @@ module Gen_struct = struct
         $getter_and_setters$ ;
         module Fields = struct
           value names = $names$ ;
-          value _ = names ;
           $fields$ ;
           $create$ ; $simple_create$ ; $iter$ ; $fold$ ; $map$ ; $map_poly$ ; $andf$ ; $orf$ ; $to_list$ ;
           module Direct = struct
@@ -556,10 +578,10 @@ module Gen_struct = struct
   let mani ~record_name ty =
     match ty with
     | <:ctyp@loc< { $x$ } >> ->
-      record ~record_name loc x
-    | _ -> failwith "the right hand side of the manifest must be a record"
+      `Ok (record ~record_name loc x)
+    | _ -> `Error "the right hand side of the manifest must be a record"
 
-  let fields_of_ty _loc ~record_name ~tps:_ ~rhs =
+  let fields_of_ty _loc ~ty_name:record_name ~tps:_ ~rhs =
     let unsupported = (fun _ _ -> raise_unsupported ()) in
     Gen.switch_tp_def
       ~alias:    unsupported
@@ -567,15 +589,15 @@ module Gen_struct = struct
       ~variants: unsupported
       ~mani:     (fun (_:Loc.t) _tp1 tp2 -> mani ~record_name tp2)
       ~nil:      (fun _ -> raise_unsupported ())
-      ~record:   (record ~record_name)
+      ~record:   (fun loc ty -> `Ok (record ~record_name loc ty))
       rhs
 
-  let generate = function
-    | Ast.TyDcl (_loc, name, tps, rhs, _) -> fields_of_ty _loc ~record_name:name ~tps ~rhs
-    | Ast.TyAnd (_loc, _, _) as tds ->
-        ignore (_loc, tds);
-        failwith "Not supported"
-    | _                             -> assert false
+  let generate rec_ typedefs =
+    generate_at_least_once
+      rec_
+      ~f:fields_of_ty
+      ~combine:(fun _loc item1 item2 -> <:str_item< $item1$; $item2$; >>)
+      typedefs
 end
 
 let () = add_generator "fields" Gen_struct.generate

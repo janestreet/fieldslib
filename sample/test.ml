@@ -1,6 +1,3 @@
-open Fieldslib
-open Printf
-open StdLabels
 
 type ('a,'b) t = {
   dir : 'a * 'b;
