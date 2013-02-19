@@ -13,3 +13,12 @@ module Rec = struct
 
   let _ = something1
 end
+
+module Private : sig
+  type t = private { a : int; mutable b : int }
+  with fields
+end = struct
+  type u = { a : int; mutable b : int }
+  type t = u = private { a : int; mutable b : int }
+  with fields
+end

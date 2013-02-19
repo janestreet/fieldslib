@@ -211,7 +211,7 @@ module Gen_sig = struct
 
 
 
-  let record ~ty_name ~tps _loc ty =
+  let record ~private_ ~ty_name ~tps _loc ty =
     let fields = Inspect.fields ty in
     let record_ty = apply_type _loc ~ty_name ~tps in
     let conv_field (res_getset, res_fields) (name, m, ty) =
@@ -219,12 +219,13 @@ module Gen_sig = struct
       let field  =
         <:sig_item< value $lid:name$ : Fieldslib.Field.t $record_ty$ $ty$ >>
       in
-      match m with
-      | `Immutable ->
+      match m, private_ with
+      | `Immutable, _
+      | `Mutable, true ->
           ( <:sig_item< $getter$ ; $res_getset$ >> ,
             <:sig_item< $field$ ; $res_fields$ >>
           )
-      | `Mutable ->
+      | `Mutable, false ->
           let setter    =
             <:sig_item< value $lid:"set_" ^ name$ : $record_ty$ -> $ty$ -> unit >> in
           ( <:sig_item< $getter$ ; $setter$ ;  $res_getset$ >> ,
@@ -249,39 +250,56 @@ module Gen_sig = struct
       <:sig_item< $getters_and_setters$ ;
           module Fields : sig
             value names : list string ;
-            $fields$ ;
-            $fold$ ;
-            $create_fun$ ; $simple_create_fun$ ; $iter$ ; $map$ ; $map_poly$ ; $and_f$ ; $or_f$ ; $to_list$ ;
-            module Direct : sig
-              $direct_iter$ ;
-              $direct_fold$ ;
-            end ;
+            $ if private_
+              (* Even though the [set] function in the first-class fields will be None
+                 if the type is declared private in the implementation, we still can't
+                 give any access to them here:
+
+                 First class fields usually contain the [set] function anyway because the
+                 type is usually private in the interface but not in the
+                 implementation. And even if they didn't or if the record was non mutable,
+                 first class fields would still expose the [fset] functions which also
+                 break the purpose of private types. So first class fields can never be
+                 exposed and any function using them (ie everything in the else branch
+                 here) can't be exposed either.
+              *)
+              then <:sig_item< >>
+              else <:sig_item<
+                $fields$ ;
+                $fold$ ;
+                $create_fun$ ; $simple_create_fun$ ; $iter$ ; $map$ ; $map_poly$ ;
+                $and_f$ ; $or_f$ ; $to_list$ ;
+                module Direct : sig
+                  $direct_iter$ ;
+                  $direct_fold$ ;
+                end ;
+              >>
+            $ ;
           end
       >>
     else
-      <:sig_item< $getters_and_setters$ ;
-          module Fields : sig
-            $fields$
-          end
+      <:sig_item<
+        $getters_and_setters$ ;
+        $ if private_
+          then <:sig_item< >>
+          else <:sig_item<
+            module Fields : sig
+              $fields$
+            end;
+          >>
+        $ ;
       >>
   ;;
 
-  let mani ~ty_name ~tps ty =
-    match ty with
-    | <:ctyp@loc< { $x$ } >> ->
-      `Ok (record ~ty_name ~tps loc x)
-    | _ -> `Error "the right hand side of the manifest must be a record"
-
   let fields_of_ty_sig _loc ~ty_name ~tps ~rhs =
-    let unsupported = (fun _ _ -> raise_unsupported ()) in
-    Gen.switch_tp_def
-      ~alias:unsupported
-      ~sum:unsupported
-      ~variants:unsupported
-      ~mani:(fun (_:Loc.t) _tp1 tp2 -> mani ~ty_name ~tps tp2)
-      ~nil:(fun _ -> raise_unsupported ())
-      ~record:(fun loc ty -> `Ok (record ~ty_name ~tps loc ty))
-      rhs
+    match rhs with
+    | <:ctyp@loc< $_$ == private { $flds$ } >>
+    | <:ctyp@loc< private { $flds$ } >> ->
+      `Ok (record ~ty_name ~private_:true ~tps loc flds)
+    | <:ctyp@loc< $_$ == { $flds$ } >>
+    | <:ctyp@loc< { $flds$ } >> ->
+      `Ok (record ~ty_name ~private_:false ~tps loc flds)
+    | _ -> raise_unsupported ()
 
   let generate rec_ typedefs =
     generate_at_least_once
@@ -293,7 +311,7 @@ module Gen_sig = struct
 end
 
 module Gen_struct = struct
-  let fields _loc ty =
+  let fields ~private_ _loc ty =
     let fields = Inspect.fields ty in
     let rec_id =
       match fields with
@@ -303,8 +321,8 @@ module Gen_struct = struct
     let conv_field (res_getset, res_fields) (name, m, field_ty) =
       let getter = <:str_item< value $lid:name$ _r__ = _r__.$lid:name$ >> in
       let setter, setter_field =
-        match m with
-        | `Mutable ->
+        match m, private_ with
+        | `Mutable, false ->
             let setter =
               <:str_item<
                 value $lid:"set_" ^ name$ _r__ v__ = _r__.$lid:name$ := v__
@@ -312,7 +330,8 @@ module Gen_struct = struct
             in
             let setter_field = <:expr< Some $lid:"set_" ^ name$ >> in
             setter, setter_field
-        | `Immutable -> <:str_item< >>, <:expr< None >>
+        | `Mutable, true
+        | `Immutable, _ -> <:str_item< >>, <:expr< None >>
       in
       let field  =
         let e =
@@ -536,8 +555,8 @@ module Gen_struct = struct
     >>
   ;;
 
-  let record ~record_name _loc ty =
-    let getter_and_setters, fields = fields _loc ty in
+  let record ~private_ ~record_name _loc ty =
+    let getter_and_setters, fields = fields ~private_ _loc ty in
     let create   = creation_fun _loc record_name ty in
     let simple_create   = simple_creation_fun _loc record_name ty in
     let names =
@@ -558,39 +577,42 @@ module Gen_struct = struct
         $getter_and_setters$ ;
         module Fields = struct
           value names = $names$ ;
-          $fields$ ;
-          $create$ ; $simple_create$ ; $iter$ ; $fold$ ; $map$ ; $map_poly$ ; $andf$ ; $orf$ ; $to_list$ ;
-          module Direct = struct
-            $direct_iter$ ;
-            $direct_fold$ ;
-          end ;
+          $ if private_
+            then <:str_item< >>
+            else <:str_item<
+              $fields$ ; $create$ ; $simple_create$ ; $iter$ ; $fold$ ; $map$ ;
+              $map_poly$ ; $andf$ ; $orf$ ; $to_list$ ;
+            module Direct = struct
+              $direct_iter$ ;
+              $direct_fold$ ;
+            end ;
+            >>
+          $ ;
         end
       >>
     else
       <:str_item<
         $getter_and_setters$ ;
-        module Fields = struct
-          $fields$ ;
-        end
+        $ if private_
+          then <:str_item< >>
+          else <:str_item<
+            module Fields = struct
+              $fields$ ;
+            end
+          >>
+        $ ;
       >>
   ;;
 
-  let mani ~record_name ty =
-    match ty with
-    | <:ctyp@loc< { $x$ } >> ->
-      `Ok (record ~record_name loc x)
-    | _ -> `Error "the right hand side of the manifest must be a record"
-
   let fields_of_ty _loc ~ty_name:record_name ~tps:_ ~rhs =
-    let unsupported = (fun _ _ -> raise_unsupported ()) in
-    Gen.switch_tp_def
-      ~alias:    unsupported
-      ~sum:      unsupported
-      ~variants: unsupported
-      ~mani:     (fun (_:Loc.t) _tp1 tp2 -> mani ~record_name tp2)
-      ~nil:      (fun _ -> raise_unsupported ())
-      ~record:   (fun loc ty -> `Ok (record ~record_name loc ty))
-      rhs
+    match rhs with
+    | <:ctyp@loc< $_$ == private { $flds$ } >>
+    | <:ctyp@loc< private { $flds$ } >> ->
+      `Ok (record ~record_name ~private_:true loc flds)
+    | <:ctyp@loc< $_$ == { $flds$ } >>
+    | <:ctyp@loc< { $flds$ } >> ->
+      `Ok (record ~record_name ~private_:false loc flds)
+    | _ -> raise_unsupported ()
 
   let generate rec_ typedefs =
     generate_at_least_once
