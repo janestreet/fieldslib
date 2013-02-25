@@ -7,6 +7,11 @@ type ('a,'b) t = {
 (*   symbol : string;   *)
 } with fields
 
+type foo = {
+  a : [`Bar | `Baz of string];
+  b : int;
+} with fields
+
 module Private = struct
   type ('a,'b) t = private {
     dir : 'a * 'b;

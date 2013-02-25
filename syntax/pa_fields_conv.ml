@@ -278,12 +278,13 @@ module Gen_sig = struct
           end
       >>
     else
+      let fields_module = "Fields_of_" ^ ty_name in
       <:sig_item<
         $getters_and_setters$ ;
         $ if private_
           then <:sig_item< >>
           else <:sig_item<
-            module Fields : sig
+            module $uid:fields_module$ : sig
               $fields$
             end;
           >>
@@ -591,12 +592,13 @@ module Gen_struct = struct
         end
       >>
     else
+      let fields_module = "Fields_of_" ^ record_name in
       <:str_item<
         $getter_and_setters$ ;
         $ if private_
           then <:str_item< >>
           else <:str_item<
-            module Fields = struct
+            module $uid:fields_module$ = struct
               $fields$ ;
             end
           >>

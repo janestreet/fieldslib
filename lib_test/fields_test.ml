@@ -14,6 +14,20 @@ module Rec = struct
   let _ = something1
 end
 
+module Multiple_names = struct
+  type a = {
+    a : int;
+  }
+  and b = {
+    b : int;
+  }
+  with fields
+  TEST = b { b = 1 } = 1
+  TEST = a { a = 1 } = 1
+  let _ = Fields_of_a.a
+  let _ = Fields_of_b.b
+end
+
 module Private : sig
   type t = private { a : int; mutable b : int }
   with fields
