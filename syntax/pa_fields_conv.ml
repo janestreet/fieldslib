@@ -263,7 +263,7 @@ module Gen_sig = struct
                  exposed and any function using them (ie everything in the else branch
                  here) can't be exposed either.
               *)
-              then <:sig_item< >>
+              then <:sig_item< $fold$; >>
               else <:sig_item<
                 $fields$ ;
                 $fold$ ;

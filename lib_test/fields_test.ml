@@ -31,8 +31,13 @@ end
 module Private : sig
   type t = private { a : int; mutable b : int }
   with fields
+  (* exporting the type u wouldn't work for now *)
 end = struct
-  type u = { a : int; mutable b : int }
-  type t = u = private { a : int; mutable b : int }
+  type t = { a : int; mutable b : int }
   with fields
+  module U = struct
+    type u = t = private { a : int; mutable b : int }
+    with fields
+  end
 end
+let _ = Private.Fields.fold

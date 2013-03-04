@@ -13,7 +13,7 @@ type foo = {
 } with fields
 
 module Private = struct
-  type ('a,'b) t = private {
+  type ('a,'b) t = {
     dir : 'a * 'b;
     quantity : ('a , 'b) t;
     price : int * 'a;
