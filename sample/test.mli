@@ -28,7 +28,7 @@ type foo = {
   b : int;
 } with fields
 
-module Private : sig
+module Private_in_mli : sig
   type ('a,'b) t = private {
     dir : 'a * 'b;
     quantity : ('a , 'b) t;
@@ -37,3 +37,15 @@ module Private : sig
     (*   symbol : string;   *)
   } with fields
 end
+
+module Private_in_ml : sig
+  type ('a,'b) t = ('a,'b) Private_in_mli.t = private {
+    dir : 'a * 'b;
+    quantity : ('a , 'b) t;
+    price : int * 'a;
+    mutable cancelled : bool;
+    (*   symbol : string;   *)
+  } with fields
+end
+
+

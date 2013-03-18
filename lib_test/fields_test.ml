@@ -26,18 +26,22 @@ module Multiple_names = struct
   TEST = a { a = 1 } = 1
   let _ = Fields_of_a.a
   let _ = Fields_of_b.b
+  let _ = (Fields_of_a.a : (_, _) Fieldslib.Field.t :> (_, _) Fieldslib.Field.readonly_t)
 end
 
 module Private : sig
   type t = private { a : int; mutable b : int }
   with fields
-  (* exporting the type u wouldn't work for now *)
 end = struct
-  type t = { a : int; mutable b : int }
+  type u = { a : int; mutable b : int }
+  type t = u = private { a : int; mutable b : int }
   with fields
-  module U = struct
-    type u = t = private { a : int; mutable b : int }
-    with fields
-  end
+  (* let _ = Fieldslib.Field.setter Fields.a *)
 end
+(* let _ = Fieldslib.Field.setter Private.Fields.a *)
 let _ = Private.Fields.fold
+let _ = Private.Fields.a
+let _ = Fieldslib.Field.name Private.Fields.a
+let _ = Fieldslib.Field.get Private.Fields.a
+let _ = Private.Fields.map_poly
+  { Fieldslib.Field.f = (fun f -> let _ = Fieldslib.Field.get f in ())}

@@ -67,6 +67,16 @@ let generate_at_least_once rec_ ~f ~combine typedefs =
 let raise_unsupported () =
   `Error "Unsupported use of fields (you can only use it on records)."
 
+let perm _loc private_ =
+  match private_ with
+  | true -> <:ctyp< [< `Read ] >>
+  | false -> <:ctyp< [< `Read | `Set_and_create ] >>
+
+let field_t _loc private_ =
+  match private_ with
+  | false -> <:ctyp< Fieldslib.Field.t >>
+  | true -> <:ctyp< Fieldslib.Field.readonly_t >>
+
 module Gen_sig = struct
   let apply_type _loc ~ty_name ~tps =
     List.fold_left tps
@@ -75,15 +85,15 @@ module Gen_sig = struct
 
   let label_arg _loc name ty = Ast.TyLab (_loc, name, ty)
 
-  let field_arg _loc ~record f = fun (name, _m, ty) ->
+  let field_arg _loc ~private_ ~record f = fun (name, _m, ty) ->
     label_arg _loc name (
-      f ~field: <:ctyp< Fieldslib.Field.t $record$ $ty$ >> ~ty)
+      f ~field: <:ctyp< $field_t _loc private_$ $record$ $ty$ >> ~ty)
   ;;
 
   let create_fun ~ty_name ~tps _loc ty =
     let record = apply_type _loc ~ty_name ~tps in
     let fields = Inspect.fields ty in
-    let f = field_arg _loc ~record (fun ~field ~ty ->
+    let f = field_arg _loc ~private_:false ~record (fun ~field ~ty ->
       let create_f = <:ctyp< 'input__ -> ( $ty$ ) >> in
       <:ctyp< $field$ -> 'compile_acc__ -> ($create_f$ * 'compile_acc__) >>
     )  in
@@ -96,10 +106,10 @@ module Gen_sig = struct
   ;;
 
 
-  let fold_fun ~ty_name ~tps _loc ty =
+  let fold_fun ~private_ ~ty_name ~tps _loc ty =
     let record  = apply_type _loc ~ty_name ~tps in
     let fields  = Inspect.fields ty in
-    let f = field_arg _loc ~record (fun ~field ~ty:_ ->
+    let f = field_arg _loc ~private_ ~record (fun ~field ~ty:_ ->
       <:ctyp< 'acc__ -> $field$ -> 'acc__ >>) in
     let types   = List.map fields ~f in
     let init_ty = label_arg _loc "init" <:ctyp< 'acc__ >> in
@@ -120,40 +130,40 @@ module Gen_sig = struct
 
 
 
-  let bool_fun fun_name ~ty_name ~tps _loc ty =
+  let bool_fun fun_name ~private_ ~ty_name ~tps _loc ty =
     let record    = apply_type _loc ~ty_name ~tps in
     let fields    = Inspect.fields ty in
-    let f = field_arg _loc ~record (fun ~field ~ty:_ ->
+    let f = field_arg _loc ~private_ ~record (fun ~field ~ty:_ ->
       <:ctyp< $field$ -> bool >> ) in
     let types   = List.map fields ~f in
     let t       = Create.lambda_sig _loc types <:ctyp< bool >> in
     <:sig_item< value $lid:fun_name$ : $t$ >>
   ;;
 
-  let iter_fun ~ty_name ~tps _loc ty =
+  let iter_fun ~private_ ~ty_name ~tps _loc ty =
     let record    = apply_type _loc ~ty_name ~tps in
     let fields    = Inspect.fields ty in
-    let f = field_arg _loc ~record (fun ~field ~ty:_ ->
+    let f = field_arg _loc ~private_ ~record (fun ~field ~ty:_ ->
       <:ctyp< $field$ -> unit >>) in
     let types  = List.map fields ~f in
     let t     = Create.lambda_sig _loc types <:ctyp< unit >> in
     <:sig_item< value iter : $t$ >>
   ;;
 
-  let direct_iter_fun ~ty_name ~tps _loc ty =
+  let direct_iter_fun ~private_ ~ty_name ~tps _loc ty =
     let record    = apply_type _loc ~ty_name ~tps in
     let fields    = Inspect.fields ty in
-    let f = field_arg _loc ~record (fun ~field ~ty:field_ty ->
+    let f = field_arg _loc ~private_ ~record (fun ~field ~ty:field_ty ->
       <:ctyp< $field$ -> $record$ -> $field_ty$ -> unit >>) in
     let types  = List.map fields ~f in
     let t     = Create.lambda_sig _loc (record :: types) <:ctyp< unit >> in
     <:sig_item< value iter : $t$ >>
   ;;
 
-  let direct_fold_fun ~ty_name ~tps _loc ty =
+  let direct_fold_fun ~private_ ~ty_name ~tps _loc ty =
     let record  = apply_type _loc ~ty_name ~tps in
     let fields  = Inspect.fields ty in
-    let f = field_arg _loc ~record (fun ~field ~ty:field_ty ->
+    let f = field_arg _loc ~private_ ~record (fun ~field ~ty:field_ty ->
       <:ctyp< 'acc__ -> $field$ -> $record$ -> $field_ty$ -> 'acc__ >>) in
     let types   = List.map fields ~f in
     let init_ty = label_arg _loc "init" <:ctyp< 'acc__ >> in
@@ -162,10 +172,10 @@ module Gen_sig = struct
     <:sig_item< value fold : $t$ >>
   ;;
 
-  let to_list_fun ~ty_name ~tps _loc ty =
+  let to_list_fun ~private_ ~ty_name ~tps _loc ty =
     let record    = apply_type _loc ~ty_name ~tps in
     let fields    = Inspect.fields ty in
-    let f = field_arg _loc ~record (fun ~field ~ty:_ ->
+    let f = field_arg _loc ~private_ ~record (fun ~field ~ty:_ ->
         <:ctyp< $field$ -> 'elem__ >>)
     in
     let types = List.map fields ~f in
@@ -176,7 +186,7 @@ module Gen_sig = struct
   let map_fun ~ty_name ~tps _loc ty =
     let record    = apply_type _loc ~ty_name ~tps in
     let fields    = Inspect.fields ty in
-    let f = field_arg _loc ~record (fun ~field ~ty ->
+    let f = field_arg _loc ~private_:false ~record (fun ~field ~ty ->
       <:ctyp< $field$ -> $ty$ >>) in
     let types = List.map fields ~f in
     let t     = Create.lambda_sig _loc (types) record in
@@ -184,7 +194,7 @@ module Gen_sig = struct
   ;;
 
 
- let map_poly ~ty_name ~tps _loc _ =
+ let map_poly ~private_ ~ty_name ~tps _loc _ =
    let record    = apply_type _loc ~ty_name ~tps in
    let tps_names =
      List.map
@@ -203,8 +213,9 @@ module Gen_sig = struct
       in
       <:ctyp<'$lid:loop 0$>>
     in
+    let perm = perm _loc private_ in
     let t =
-      <:ctyp< Fieldslib.Field.user $record$ $fresh_variable$ -> list $fresh_variable$  >>
+      <:ctyp< Fieldslib.Field.user $perm$ $record$ $fresh_variable$ -> list $fresh_variable$  >>
     in
     <:sig_item< value map_poly : $t$ >>
  ;;
@@ -217,7 +228,7 @@ module Gen_sig = struct
     let conv_field (res_getset, res_fields) (name, m, ty) =
       let getter = <:sig_item< value $lid:name$ : $record_ty$ -> $ty$ >> in
       let field  =
-        <:sig_item< value $lid:name$ : Fieldslib.Field.t $record_ty$ $ty$ >>
+        <:sig_item< value $lid:name$ : $field_t _loc private_$ $record_ty$ $ty$ >>
       in
       match m, private_ with
       | `Immutable, _
@@ -238,57 +249,44 @@ module Gen_sig = struct
     let create_fun = create_fun ~ty_name ~tps _loc ty in
     let simple_create_fun = simple_create_fun ~ty_name ~tps _loc ty in
     if ty_name = "t" then
-      let iter        = iter_fun ~ty_name ~tps _loc ty in
-      let fold        = fold_fun ~ty_name ~tps _loc ty in
+      let iter        = iter_fun ~private_ ~ty_name ~tps _loc ty in
+      let fold        = fold_fun ~private_ ~ty_name ~tps _loc ty in
       let map         = map_fun ~ty_name ~tps _loc ty in
-      let map_poly         = map_poly ~ty_name ~tps _loc ty in
-      let and_f       = bool_fun "for_all" ~ty_name ~tps _loc ty in
-      let or_f        = bool_fun "exists" ~ty_name ~tps _loc ty in
-      let to_list     = to_list_fun ~ty_name ~tps _loc ty in
-      let direct_iter = direct_iter_fun ~ty_name ~tps _loc ty in
-      let direct_fold = direct_fold_fun ~ty_name ~tps _loc ty in
+      let map_poly    = map_poly ~private_ ~ty_name ~tps _loc ty in
+      let and_f       = bool_fun "for_all" ~private_ ~ty_name ~tps _loc ty in
+      let or_f        = bool_fun "exists" ~private_ ~ty_name ~tps _loc ty in
+      let to_list     = to_list_fun ~private_ ~ty_name ~tps _loc ty in
+      let direct_iter = direct_iter_fun ~private_ ~ty_name ~tps _loc ty in
+      let direct_fold = direct_fold_fun ~private_ ~ty_name ~tps _loc ty in
       <:sig_item< $getters_and_setters$ ;
           module Fields : sig
             value names : list string ;
+            $fields$ ;
+            $fold$ ;
             $ if private_
-              (* Even though the [set] function in the first-class fields will be None
-                 if the type is declared private in the implementation, we still can't
-                 give any access to them here:
+              (* The ['perm] phantom type prohibits first-class fields from mutating or
+                 creating private records, so we can expose them (and fold, etc.).
 
-                 First class fields usually contain the [set] function anyway because the
-                 type is usually private in the interface but not in the
-                 implementation. And even if they didn't or if the record was non mutable,
-                 first class fields would still expose the [fset] functions which also
-                 break the purpose of private types. So first class fields can never be
-                 exposed and any function using them (ie everything in the else branch
-                 here) can't be exposed either.
+                 However, we still can't expose functions that explicitly create private
+                 records.
               *)
-              then <:sig_item< $fold$; >>
-              else <:sig_item<
-                $fields$ ;
-                $fold$ ;
-                $create_fun$ ; $simple_create_fun$ ; $iter$ ; $map$ ; $map_poly$ ;
-                $and_f$ ; $or_f$ ; $to_list$ ;
-                module Direct : sig
-                  $direct_iter$ ;
-                  $direct_fold$ ;
-                end ;
-              >>
+              then <:sig_item< >>
+              else <:sig_item< $create_fun$ ; $simple_create_fun$ ; $map$ ; >>
             $ ;
+            $iter$ ; $and_f$ ; $or_f$ ; $to_list$ ; $map_poly$ ;
+            module Direct : sig
+              $direct_iter$ ;
+              $direct_fold$ ;
+            end ;
           end
       >>
     else
       let fields_module = "Fields_of_" ^ ty_name in
       <:sig_item<
         $getters_and_setters$ ;
-        $ if private_
-          then <:sig_item< >>
-          else <:sig_item<
-            module $uid:fields_module$ : sig
-              $fields$
-            end;
-          >>
-        $ ;
+        module $uid:fields_module$ : sig
+            $fields$
+        end;
       >>
   ;;
 
@@ -323,6 +321,9 @@ module Gen_struct = struct
       let getter = <:str_item< value $lid:name$ _r__ = _r__.$lid:name$ >> in
       let setter, setter_field =
         match m, private_ with
+        | `Mutable, true ->
+          <:str_item< >>,
+          <:expr< Some (fun _ _ -> failwith "invalid call to a setter of a private type") >>
         | `Mutable, false ->
             let setter =
               <:str_item<
@@ -331,7 +332,6 @@ module Gen_struct = struct
             in
             let setter_field = <:expr< Some $lid:"set_" ^ name$ >> in
             setter, setter_field
-        | `Mutable, true
         | `Immutable, _ -> <:str_item< >>, <:expr< None >>
       in
       let field  =
@@ -341,15 +341,22 @@ module Gen_struct = struct
               Ast.ExId (_loc, Ast.IdLid (_loc, "v__"))),
             rec_id)
         in
-        let fset = <:expr< fun _r__ v__ -> $e$ >> in
+        let fset =
+          match private_ with
+          | true ->
+            <:expr< fun _ _ -> failwith "Invalid call to an fsetter of a private type" >>
+          | false -> <:expr< fun _r__ v__ -> $e$ >>
+        in
+        let perm = perm _loc private_ in
         <:str_item<
-          value $lid:name$ =
-            ( { Fieldslib.Field.
-              name    = $str:name$;
-              getter  = $lid:name$;
-              setter  = $setter_field$;
-              fset    = $fset$;
-            } : Fieldslib.Field.t _ $field_ty$ )
+          value $lid:name$ : Fieldslib.Field.t_with_perm $perm$ _ $field_ty$ =
+              Fieldslib.Field.Field { Fieldslib.Field.For_generated_code.
+                force_variance = (fun (_ : $perm$) -> ());
+                name = $str:name$;
+                getter = $lid:name$;
+                setter = $setter_field$;
+                fset = $fset$;
+              }
         >>
       in
       ( <:str_item< $getter$ ; $setter$ ; $res_getset$ >>,
@@ -578,31 +585,26 @@ module Gen_struct = struct
         $getter_and_setters$ ;
         module Fields = struct
           value names = $names$ ;
+          $fields$;
           $ if private_
             then <:str_item< >>
-            else <:str_item<
-              $fields$ ; $create$ ; $simple_create$ ; $iter$ ; $fold$ ; $map$ ;
-              $map_poly$ ; $andf$ ; $orf$ ; $to_list$ ;
-            module Direct = struct
-              $direct_iter$ ;
-              $direct_fold$ ;
-            end ;
-            >>
+            else <:str_item< $create$ ; $simple_create$; $map$; >>
           $ ;
+          $iter$ ; $fold$ ; $map_poly$ ;
+          $andf$ ; $orf$ ; $to_list$ ;
+          module Direct = struct
+            $direct_iter$ ;
+            $direct_fold$ ;
+          end ;
         end
       >>
     else
       let fields_module = "Fields_of_" ^ record_name in
       <:str_item<
         $getter_and_setters$ ;
-        $ if private_
-          then <:str_item< >>
-          else <:str_item<
-            module $uid:fields_module$ = struct
-              $fields$ ;
-            end
-          >>
-        $ ;
+        module $uid:fields_module$ = struct
+          $fields$ ;
+        end
       >>
   ;;
 
