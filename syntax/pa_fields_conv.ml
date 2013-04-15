@@ -248,46 +248,38 @@ module Gen_sig = struct
     in
     let create_fun = create_fun ~ty_name ~tps _loc ty in
     let simple_create_fun = simple_create_fun ~ty_name ~tps _loc ty in
-    if ty_name = "t" then
-      let iter        = iter_fun ~private_ ~ty_name ~tps _loc ty in
-      let fold        = fold_fun ~private_ ~ty_name ~tps _loc ty in
-      let map         = map_fun ~ty_name ~tps _loc ty in
-      let map_poly    = map_poly ~private_ ~ty_name ~tps _loc ty in
-      let and_f       = bool_fun "for_all" ~private_ ~ty_name ~tps _loc ty in
-      let or_f        = bool_fun "exists" ~private_ ~ty_name ~tps _loc ty in
-      let to_list     = to_list_fun ~private_ ~ty_name ~tps _loc ty in
-      let direct_iter = direct_iter_fun ~private_ ~ty_name ~tps _loc ty in
-      let direct_fold = direct_fold_fun ~private_ ~ty_name ~tps _loc ty in
-      <:sig_item< $getters_and_setters$ ;
-          module Fields : sig
-            value names : list string ;
-            $fields$ ;
-            $fold$ ;
-            $ if private_
-              (* The ['perm] phantom type prohibits first-class fields from mutating or
-                 creating private records, so we can expose them (and fold, etc.).
-
-                 However, we still can't expose functions that explicitly create private
-                 records.
-              *)
-              then <:sig_item< >>
-              else <:sig_item< $create_fun$ ; $simple_create_fun$ ; $map$ ; >>
-            $ ;
-            $iter$ ; $and_f$ ; $or_f$ ; $to_list$ ; $map_poly$ ;
-            module Direct : sig
-              $direct_iter$ ;
-              $direct_fold$ ;
-            end ;
-          end
-      >>
-    else
-      let fields_module = "Fields_of_" ^ ty_name in
-      <:sig_item<
-        $getters_and_setters$ ;
+    let fields_module = if ty_name = "t" then "Fields" else "Fields_of_" ^ ty_name in
+    let iter        = iter_fun ~private_ ~ty_name ~tps _loc ty in
+    let fold        = fold_fun ~private_ ~ty_name ~tps _loc ty in
+    let map         = map_fun ~ty_name ~tps _loc ty in
+    let map_poly    = map_poly ~private_ ~ty_name ~tps _loc ty in
+    let and_f       = bool_fun "for_all" ~private_ ~ty_name ~tps _loc ty in
+    let or_f        = bool_fun "exists" ~private_ ~ty_name ~tps _loc ty in
+    let to_list     = to_list_fun ~private_ ~ty_name ~tps _loc ty in
+    let direct_iter = direct_iter_fun ~private_ ~ty_name ~tps _loc ty in
+    let direct_fold = direct_fold_fun ~private_ ~ty_name ~tps _loc ty in
+    <:sig_item< $getters_and_setters$ ;
         module $uid:fields_module$ : sig
-            $fields$
-        end;
-      >>
+          value names : list string ;
+          $fields$ ;
+          $fold$ ;
+          $ if private_
+            (* The ['perm] phantom type prohibits first-class fields from mutating or
+               creating private records, so we can expose them (and fold, etc.).
+
+               However, we still can't expose functions that explicitly create private
+               records.
+            *)
+            then <:sig_item< >>
+            else <:sig_item< $create_fun$ ; $simple_create_fun$ ; $map$ ; >>
+          $ ;
+          $iter$ ; $and_f$ ; $or_f$ ; $to_list$ ; $map_poly$ ;
+          module Direct : sig
+            $direct_iter$ ;
+            $direct_fold$ ;
+          end ;
+        end
+    >>
   ;;
 
   let fields_of_ty_sig _loc ~ty_name ~tps ~rhs =
@@ -571,41 +563,33 @@ module Gen_struct = struct
       List.fold_right (Inspect.field_names ty) ~init:<:expr< [ ] >> ~f:(fun head tail ->
         <:expr< [ $str:head$ :: $tail$ ] >>)
     in
-    if record_name = "t" then
-      let iter        = iter_fun ~record_name _loc ty in
-      let fold        = fold_fun ~record_name _loc ty in
-      let map         = map_fun ~record_name _loc ty in
-      let map_poly    = map_poly ~record_name _loc ty in
-      let andf        = and_fun ~record_name _loc ty in
-      let orf         = or_fun ~record_name _loc ty in
-      let direct_iter = direct_iter_fun ~record_name _loc ty in
-      let direct_fold = direct_fold_fun ~record_name _loc ty in
-      let to_list     = to_list_fun ~record_name _loc ty in
-      <:str_item<
-        $getter_and_setters$ ;
-        module Fields = struct
-          value names = $names$ ;
-          $fields$;
-          $ if private_
-            then <:str_item< >>
-            else <:str_item< $create$ ; $simple_create$; $map$; >>
-          $ ;
-          $iter$ ; $fold$ ; $map_poly$ ;
-          $andf$ ; $orf$ ; $to_list$ ;
-          module Direct = struct
-            $direct_iter$ ;
-            $direct_fold$ ;
-          end ;
-        end
-      >>
-    else
-      let fields_module = "Fields_of_" ^ record_name in
-      <:str_item<
-        $getter_and_setters$ ;
-        module $uid:fields_module$ = struct
-          $fields$ ;
-        end
-      >>
+    let fields_module = if record_name = "t" then "Fields" else "Fields_of_" ^ record_name in
+    let iter        = iter_fun ~record_name _loc ty in
+    let fold        = fold_fun ~record_name _loc ty in
+    let map         = map_fun ~record_name _loc ty in
+    let map_poly    = map_poly ~record_name _loc ty in
+    let andf        = and_fun ~record_name _loc ty in
+    let orf         = or_fun ~record_name _loc ty in
+    let direct_iter = direct_iter_fun ~record_name _loc ty in
+    let direct_fold = direct_fold_fun ~record_name _loc ty in
+    let to_list     = to_list_fun ~record_name _loc ty in
+    <:str_item<
+      $getter_and_setters$ ;
+      module $uid:fields_module$ = struct
+        value names = $names$ ;
+        $fields$;
+        $ if private_
+          then <:str_item< >>
+          else <:str_item< $create$ ; $simple_create$; $map$; >>
+        $ ;
+        $iter$ ; $fold$ ; $map_poly$ ;
+        $andf$ ; $orf$ ; $to_list$ ;
+        module Direct = struct
+          $direct_iter$ ;
+          $direct_fold$ ;
+        end ;
+      end
+    >>
   ;;
 
   let fields_of_ty _loc ~ty_name:record_name ~tps:_ ~rhs =
