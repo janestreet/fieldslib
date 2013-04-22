@@ -45,3 +45,13 @@ let _ = Fieldslib.Field.name Private.Fields.a
 let _ = Fieldslib.Field.get Private.Fields.a
 let _ = Private.Fields.map_poly
   { Fieldslib.Field.f = (fun f -> let _ = Fieldslib.Field.get f in ())}
+
+module Warnings : sig
+  (* could generate an unused warning but for crazy reasons, only
+     when the type is private *)
+  type t = private { foo : int } with fields
+  val foo : string
+end = struct
+  type t = { foo : int } with fields
+  let foo = "a"
+end
