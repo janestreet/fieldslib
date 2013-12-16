@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: ce3d74c88aa97c0726af494a78415d4d) *)
+(* DO NOT EDIT (digest: 0b8db2b9d5a91e7fb3d2b5de26b8e6cc) *)
 This is the INSTALL file for the fieldslib distribution.
 
 This package uses OASIS to generate its build system. See section OASIS for
@@ -24,7 +24,7 @@ Installing
 Uninstalling
 ============
 
-1. Go to the root of the package 
+1. Go to the root of the package
 2. Run 'ocaml setup.ml -uninstall'
 
 OASIS

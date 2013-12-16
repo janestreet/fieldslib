@@ -1,6 +1,6 @@
 # OASIS_START
-# DO NOT EDIT (digest: 275d3bd3ba3dc186deeb53f5be3a7f0b)
-version = "109.20.00"
+# DO NOT EDIT (digest: f211352436e4b5b0caecbc697b03c95a)
+version = "109.20.01"
 description = "OCaml record fields as first class values."
 archive(byte) = "fieldslib.cma"
 archive(byte, plugin) = "fieldslib.cma"
@@ -8,11 +8,15 @@ archive(native) = "fieldslib.cmxa"
 archive(native, plugin) = "fieldslib.cmxs"
 exists_if = "fieldslib.cma"
 package "syntax" (
- version = "109.20.00"
+ version = "109.20.01"
  description = "Syntax extension for Fieldslib"
  requires = "camlp4 type_conv fieldslib"
  archive(syntax, preprocessor) = "pa_fields_conv.cma"
  archive(syntax, toploop) = "pa_fields_conv.cma"
+ archive(syntax, byte) = "pa_fields_conv.cma"
+ archive(syntax, byte, plugin) = "pa_fields_conv.cma"
+ archive(syntax, native) = "pa_fields_conv.cmxa"
+ archive(syntax, native, plugin) = "pa_fields_conv.cmxs"
  exists_if = "pa_fields_conv.cma"
 )
 # OASIS_STOP
