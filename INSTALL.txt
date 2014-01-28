@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: 0b8db2b9d5a91e7fb3d2b5de26b8e6cc) *)
+(* DO NOT EDIT (digest: a448080f52ebfe26cb37cf1a161484cd) *)
 This is the INSTALL file for the fieldslib distribution.
 
 This package uses OASIS to generate its build system. See section OASIS for
@@ -9,7 +9,7 @@ Dependencies
 ============
 
 In order to compile this package, you will need:
-* ocaml (>= 4.00.0) for all, doc fieldslib
+* ocaml (>= 4.00.0)
 * findlib (>= 1.3.2)
 * type_conv (>= 109.20.00) for library pa_fields_conv
 
