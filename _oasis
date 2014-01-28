@@ -39,10 +39,3 @@ Library pa_fields_conv
   XMETAType:          syntax
   XMETARequires:      camlp4,type_conv,fieldslib
   XMETADescription:   Syntax extension for Fieldslib
-
-Document "fieldslib"
-  Title:                API reference for fieldslib
-  Type:                 ocamlbuild (0.3)
-  BuildTools+:          ocamldoc
-  XOCamlbuildPath:      lib
-  XOCamlbuildLibraries: fieldslib
