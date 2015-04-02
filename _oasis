@@ -4,9 +4,9 @@ FindlibVersion:   >= 1.3.2
 Name:             fieldslib
 Version:          109.20.00
 Synopsis:         OCaml record fields as first class values.
-Authors:          Jane Street Capital LLC <opensource@janestreet.com>
-Copyrights:       (C) 2009-2013 Jane Street Capital LLC <opensource@janestreet.com>
-Maintainers:      Jane Street Capital LLC <opensource@janestreet.com>
+Authors:          Jane Street Group, LLC <opensource@janestreet.com>
+Copyrights:       (C) 2009-2013 Jane Street Group, LLC <opensource@janestreet.com>
+Maintainers:      Jane Street Group, LLC <opensource@janestreet.com>
 License:          Apache-2.0
 LicenseFile:      LICENSE.txt
 Homepage:         https://github.com/janestreet/fieldslib
