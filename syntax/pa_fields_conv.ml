@@ -194,33 +194,45 @@ module Gen_sig = struct
   ;;
 
 
- let map_poly ~private_ ~ty_name ~tps _loc _ =
-   let record    = apply_type _loc ~ty_name ~tps in
-   let tps_names =
-     List.map
-       ~f:(function
-         | <:ctyp< '$a$ >> -> a
-         | _ -> assert false)
-       tps
-   in
-    let fresh_variable =
-      let rec loop i =
-        let ret = sprintf "x%i" i in
-        if List.mem ret ~set:tps_names then
-          loop (i+1)
-        else
-          ret
+  let map_poly ~private_ ~ty_name ~tps _loc _ =
+    let record    = apply_type _loc ~ty_name ~tps in
+    let tps_names =
+      List.map
+        ~f:(function
+          | <:ctyp< '$a$ >> -> a
+          | _ -> assert false)
+        tps
+    in
+     let fresh_variable =
+       let rec loop i =
+         let ret = sprintf "x%i" i in
+         if List.mem ret ~set:tps_names then
+           loop (i+1)
+         else
+           ret
+       in
+       <:ctyp<'$lid:loop 0$>>
+     in
+     let perm = perm _loc private_ in
+     let t =
+       <:ctyp< Fieldslib.Field.user $perm$ $record$ $fresh_variable$ -> list $fresh_variable$  >>
+     in
+     <:sig_item< value map_poly : $t$ >>
+  ;;
+
+  let set_all_mutable_fields_fun ~private_ ~ty_name ~tps _loc ty =
+    if private_ then <:sig_item< >>
+    else
+      let record = apply_type _loc ~ty_name ~tps in
+      let fields = Inspect.fields ty in
+      let labels =
+        List.fold_right fields ~init:<:ctyp< unit >> ~f:(fun (field, mutable_, typ) acc ->
+          match mutable_ with
+          | `Immutable -> acc
+          | `Mutable -> <:ctyp< ~ $lid:field$:$typ$ -> $acc$ >>)
       in
-      <:ctyp<'$lid:loop 0$>>
-    in
-    let perm = perm _loc private_ in
-    let t =
-      <:ctyp< Fieldslib.Field.user $perm$ $record$ $fresh_variable$ -> list $fresh_variable$  >>
-    in
-    <:sig_item< value map_poly : $t$ >>
- ;;
-
-
+      <:sig_item< value set_all_mutable_fields : $record$ -> $labels$ >>
+  ;;
 
   let record ~private_ ~ty_name ~tps _loc ty =
     let fields = Inspect.fields ty in
@@ -258,6 +270,9 @@ module Gen_sig = struct
     let to_list     = to_list_fun ~private_ ~ty_name ~tps _loc ty in
     let direct_iter = direct_iter_fun ~private_ ~ty_name ~tps _loc ty in
     let direct_fold = direct_fold_fun ~private_ ~ty_name ~tps _loc ty in
+    let set_all_mutable_fields =
+      set_all_mutable_fields_fun ~private_ ~ty_name ~tps _loc ty
+    in
     <:sig_item< $getters_and_setters$ ;
         module $uid:fields_module$ : sig
           value names : list string ;
@@ -277,6 +292,7 @@ module Gen_sig = struct
           module Direct : sig
             $direct_iter$ ;
             $direct_fold$ ;
+            $set_all_mutable_fields$ ;
           end ;
         end
     >>
@@ -555,6 +571,30 @@ module Gen_struct = struct
     >>
   ;;
 
+  let set_all_mutable_fields_fun ~private_ _loc ty =
+    if private_ then <:str_item< >>
+    else
+      (* We dont use gensym in any other places in this file.  Be consistent here. *)
+      let record_name = "_record__" in
+      let fields = Inspect.fields ty in
+      let body =
+        let exprs =
+          List.fold_right fields ~init:[] ~f:(fun (field, mutable_, _typ) acc ->
+            match mutable_ with
+            | `Immutable -> acc
+            | `Mutable -> <:expr< $lid:record_name$.$lid:field$ := $lid:field$ >> :: acc)
+        in
+        <:expr< do { $list:exprs$ } >>
+      in
+      let function_ =
+        List.fold_right fields ~init:body ~f:(fun (field, mutable_, _typ) acc ->
+          match mutable_ with
+          | `Immutable -> acc
+          | `Mutable -> <:expr< fun [ ~ $field$ -> $acc$ ] >>)
+      in
+      <:str_item< value set_all_mutable_fields = fun $lid:record_name$ -> $function_$ >>
+  ;;
+
   let record ~private_ ~record_name _loc ty =
     let getter_and_setters, fields = fields ~private_ _loc ty in
     let create   = creation_fun _loc record_name ty in
@@ -573,6 +613,7 @@ module Gen_struct = struct
     let direct_iter = direct_iter_fun ~record_name _loc ty in
     let direct_fold = direct_fold_fun ~record_name _loc ty in
     let to_list     = to_list_fun ~record_name _loc ty in
+    let set_all_mutable_fields = set_all_mutable_fields_fun ~private_ _loc ty in
     <:str_item<
       $getter_and_setters$ ;
       module $uid:fields_module$ = struct
@@ -587,6 +628,7 @@ module Gen_struct = struct
         module Direct = struct
           $direct_iter$ ;
           $direct_fold$ ;
+          $set_all_mutable_fields$ ;
         end ;
       end
     >>

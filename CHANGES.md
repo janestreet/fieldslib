@@ -1,3 +1,13 @@
+## 113.00.00
+
+- Added `Fields.Direct.set_all_mutable_fields`, a function intended to
+  guarantee when pooling records that one cannot forget to reinitialize some
+  fields.
+
+    Obviously one could achieve this through something like
+    `Fields.Direct.iter`, but we want a more efficient version that
+    doesn't force the call side to create closures.
+
 ## 109.19.00
 
 - Made `with fields` generate the same functions in the `Fields` and
