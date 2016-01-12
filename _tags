@@ -1,3 +1,7 @@
+<**/*.ml{,i}>: warn(-40), no_alias_deps
+<**/*>: thread
+# This prevents the implicit addition of -ppx options by ocamlfind
+<**/*.ml{,i}>: predicate(ppx_driver)
+<src/*.ml>: for-pack(Fieldslib)
 # OASIS_START
 # OASIS_STOP
-<syntax/pa_fields_conv.ml>: syntax_camlp4o

@@ -13,16 +13,16 @@ module For_generated_code : sig
 end
 (**/**)
 
-(* ['record] is the type of the record.  ['field] is the type of the
-   values stored in the record field with name [name]. ['perm] is a way
-   of restricting the operations that can be used. *)
+(** ['record] is the type of the record.  ['field] is the type of the
+    values stored in the record field with name [name]. ['perm] is a way
+    of restricting the operations that can be used. *)
 type ('perm, 'record, 'field) t_with_perm =
 | Field of ('perm, 'record, 'field) For_generated_code.t
 
-(* a record field with no restriction *)
+(** A record field with no restriction. *)
 type ('record, 'field) t = ([ `Read | `Set_and_create], 'record, 'field) t_with_perm
 
-(* a record that can only be read, because it belongs to a private type *)
+(** A record that can only be read, because it belongs to a private type. *)
 type ('record, 'field) readonly_t = ([ `Read ], 'record, 'field) t_with_perm
 
 val name : (_, _, _) t_with_perm -> string
