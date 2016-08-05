@@ -1,0 +1,5 @@
+(library
+ ((name fieldslib)
+  (public_name fieldslib)
+  (preprocess (((pps ()) All)))
+  (js_of_ocaml ())))
