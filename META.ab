@@ -1,8 +1,0 @@
-version = "$(pkg_version)"
-description = "Syntax extension to define first class values representing record fields, to get and set record fields, iterate and fold over all fields of a record and create new record values"
-requires = "base"
-archive(byte  ) = "fieldslib.cma"
-archive(native) = "fieldslib.cmxa"
-plugin(byte  ) = "fieldslib.cma"
-plugin(native) = "fieldslib.cmxs"
-exists_if = "fieldslib.cma"
