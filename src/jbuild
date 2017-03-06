@@ -2,7 +2,7 @@
  ((name fieldslib)
   (public_name fieldslib)
   (libraries (base))
-  (preprocess (pps ()))
+  (preprocess (pps ( ppx_driver.runner)))
 ))
 
 (jbuild_version jane_street)
