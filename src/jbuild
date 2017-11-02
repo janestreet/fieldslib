@@ -2,6 +2,7 @@
  ((name fieldslib)
   (public_name fieldslib)
   (libraries (base))
+  (flags (:standard -safe-string))
   (preprocess (pps ( ppx_driver.runner)))
 ))
 
