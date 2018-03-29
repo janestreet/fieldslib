@@ -2,7 +2,6 @@
  ((name fieldslib)
   (public_name fieldslib)
   (libraries (base))
-  (flags (:standard -safe-string))
   (preprocess (pps ( ppxlib.runner)))
 ))
 
