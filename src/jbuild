@@ -1,9 +1,0 @@
-(library
- ((name fieldslib)
-  (public_name fieldslib)
-  (libraries (base))
-  (preprocess (pps ( ppxlib.runner)))
-))
-
-
-(jbuild_version 1)
