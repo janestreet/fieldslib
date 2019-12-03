@@ -12,7 +12,7 @@ build: [
 depends: [
   "ocaml" {>= "4.04.2"}
   "base"
-  "dune" {>= "1.5.1"}
+  "dune" {>= "2.0.0"}
 ]
 synopsis: "Syntax extension to define first class values representing record fields, to get and set record fields, iterate and fold over all fields of a record and create new record values"
 description: "
