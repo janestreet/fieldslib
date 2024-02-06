@@ -1,2 +1,5 @@
-(library (name fieldslib) (public_name fieldslib) (libraries base)
+(library
+ (name fieldslib)
+ (public_name fieldslib)
+ (libraries base)
  (preprocess no_preprocessing))
